@@ -17,7 +17,6 @@ StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 UrlDownload = "856ac37a-3032-4c1c-9122-f86d88358c8b"
 ZipFile = "a5390f91-8eb1-5f08-bee0-b1d1ffed6cea"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
-FF5Regression = "f1a6dea7-d86f-40c0-8653-6b6c149737bb"
 
 
 [compat]
