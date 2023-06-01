@@ -108,36 +108,65 @@ function get_main_data(sym, startdate, enddate)
 end 
 
 """
-regression_data: Calculates the equation of the multiple regression line 
+model_results: Calculates the equation of the multiple regression line 
 of excess returns against the Fama French 5 factors and the model 
 performance.
 """
-function regression_data(sym, startdate, enddate)
-    df = get_main_data(sym, startdate, enddate)
+function model_results(sym, startdate, enddate, model)
+    if typeof(sym) == String
+        companies = Base.vect(sym)
+    elseif typeof(sym) == Array{String, 1} 
+        companies = sym
+    else
+        return("Incorrect data type entered as ticker - enter either a single ticker as a string or a vector containing multiple tickers")
+    end
 
-    # Density Plot
-    density(df.Excess_Returns , title = "Density Plot - Excess Returns", ylabel = "Frequency", xlabel = "Excess Returns", legend = false)
-    fm = @formula(Excess_Returns ~ MKT_RF + SMB + HML + RMW + CMA)
-    train, test = splitobs(shuffleobs(df), at = 0.75)
-    linearRegressor = lm(fm, train)
-    ttestresults = @time linearRegressor
+    for company in companies
+        df = get_main_data(company, startdate, enddate)
 
-    # coefficients of model 
-    coefficients = coef(linearRegressor)
-    println("The modelled equation using test data is : Excess Returns = $(coefficients[1]) + $(coefficients[2]) MKT_RF + $(coefficients[3]) SMB + $(coefficients[4]) HML + $(coefficients[5]) RMW + $(coefficients[6]) CMA ")
-    standard_errors = stderror(linearRegressor)
-    println("")
-    println("The standard errors of the coefficients are:")
-    println("Constant: $(standard_errors[1])")
-    println("MKT_RF: $(standard_errors[2])")
-    println("SMB: $(standard_errors[3])")
-    println("HML: $(standard_errors[4])")
-    println("RMW: $(standard_errors[5])")
-    println("CMA: $(standard_errors[6])")
+        # model formula
+        if model == "CAPM"
+            fm = @formula(Excess_Returns ~ MKT_RF)
+        elseif model ==  "FF3"
+            fm = @formula(Excess_Returns ~ MKT_RF + SMB + HML)
+        elseif model == "FF5"
+            fm = @formula(Excess_Returns ~ MKT_RF + SMB + HML + RMW + CMA)
+        end
+        train, test = splitobs(shuffleobs(df), at = 0.75)
+        linearRegressor = lm(fm, train)
+        ttestresults = @time linearRegressor
 
+        # coefficients and std errors of model 
+        coefficients = coef(linearRegressor)
+        standard_errors = stderror(linearRegressor)
+        if model == "CAPM"
+            println("The modelled equation using test data is : Excess Returns = $(coefficients[1]) + $(coefficients[2]) MKT_RF ")
+            println("")
+            println("The standard errors of the coefficients are:")
+            println("Constant: $(standard_errors[1])")
+            println("MKT_RF: $(standard_errors[2])")
+        elseif model ==  "FF3"
+            println("The modelled equation using test data is : Excess Returns = $(coefficients[1]) + $(coefficients[2]) MKT_RF + $(coefficients[3]) SMB + $(coefficients[4]) HML ")
+            println("")
+            println("The standard errors of the coefficients are:")
+            println("Constant: $(standard_errors[1])")
+            println("MKT_RF: $(standard_errors[2])")
+            println("SMB: $(standard_errors[3])")
+            println("HML: $(standard_errors[4])")
+        elseif model ==  "FF5"
+            println("The modelled equation using test data is : Excess Returns = $(coefficients[1]) + $(coefficients[2]) MKT_RF + $(coefficients[3]) SMB + $(coefficients[4]) HML + $(coefficients[5]) RMW + $(coefficients[6]) CMA ")
+            println("")
+            println("The standard errors of the coefficients are:")
+            println("Constant: $(standard_errors[1])")
+            println("MKT_RF: $(standard_errors[2])")
+            println("SMB: $(standard_errors[3])")
+            println("HML: $(standard_errors[4])")
+            println("RMW: $(standard_errors[5])")
+            println("CMA: $(standard_errors[6])")
+        end
 
-    # R Square value of the model
-    println("R Square value: ", r2(linearRegressor))
+        # R Square value of the model
+        println("R Square value: ", r2(linearRegressor))
 
         # Prediction
         ypredicted_test = predict(linearRegressor, test)
@@ -146,23 +175,24 @@ function regression_data(sym, startdate, enddate)
         performance_testdf = DataFrame(y_actual = test[!,:Excess_Returns], y_predicted = ypredicted_test)
         performance_testdf.error = performance_testdf[!,:y_actual] - performance_testdf[!,:y_predicted]
         performance_testdf.error_sq = performance_testdf.error.*performance_testdf.error
-    
-    
+        
+        
         # Test Error
         println("Mean Absolute test error: ",mean(abs.(performance_testdf.error)), "\n")
         println("Mean square test error: ",mean(performance_testdf.error_sq), "\n")
-    
+        
         # Scatter plot of actual vs predicted values on test dataset
         test_plot = scatter(performance_testdf[!,:y_actual],performance_testdf[!,:y_predicted], title = "Predicted value vs Actual value on Test Data", ylabel = "Predicted value", xlabel = "Actual value", legend = false)
-    
+        
         # Result of t test
         println("T test results:")
         println(ttestresults)
         println("\n")
-    
+        
         # Result of f test
         println("F test results: ")
         println(ftest(linearRegressor.model))
     end
+end   
 
 end
