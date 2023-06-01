@@ -1,5 +1,5 @@
 module FF5Regression
-using GLM, DataFrames, CSV, Plots, Lathe, StatsPlots, MLDataUtils, MLBase, HTTP, ZipFile, Dates
+using GLM, DataFrames, CSV, Plots, MLDataUtils, MLBase, HTTP, ZipFile, Dates
 
 """
 generate_ff_monthly_data: Generates the latest monthly data from the Fama French 5 Factors documents in the form of a 
