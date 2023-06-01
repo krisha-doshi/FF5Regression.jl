@@ -1,5 +1,5 @@
 module FF5Regression
-using GLM, DataFrames, CSV, Plots, MLDataUtils, MLBase, HTTP, ZipFile, Dates
+using GLM, DataFrames, CSV, Plots, MLDataUtils, MLBase, HTTP, ZipFile, Dates, DataStructures
 
 """
 generate_ff_monthly_data: Generates the latest monthly data from the Fama French 5 Factors documents in the form of a 
@@ -121,17 +121,21 @@ function model_results(sym, startdate, enddate, model)
         return("Incorrect data type entered as ticker - enter either a single ticker as a string or a vector containing multiple tickers")
     end
 
+    # model formula
+    if model == "CAPM"
+        fm = @formula(Excess_Returns ~ MKT_RF)
+    elseif model ==  "FF3"
+        fm = @formula(Excess_Returns ~ MKT_RF + SMB + HML)
+    elseif model == "FF5"
+        fm = @formula(Excess_Returns ~ MKT_RF + SMB + HML + RMW + CMA)
+    else
+        return("Incorrect model entered")
+    end
+
+    output_df = DataFrame()
+    # output_dict = DefaultDict{String, Dict{String, String}}(()->Dict{String,String}())
     for company in companies
         df = get_main_data(company, startdate, enddate)
-
-        # model formula
-        if model == "CAPM"
-            fm = @formula(Excess_Returns ~ MKT_RF)
-        elseif model ==  "FF3"
-            fm = @formula(Excess_Returns ~ MKT_RF + SMB + HML)
-        elseif model == "FF5"
-            fm = @formula(Excess_Returns ~ MKT_RF + SMB + HML + RMW + CMA)
-        end
         train, test = splitobs(shuffleobs(df), at = 0.75)
         linearRegressor = lm(fm, train)
         ttestresults = @time linearRegressor
@@ -139,60 +143,36 @@ function model_results(sym, startdate, enddate, model)
         # coefficients and std errors of model 
         coefficients = coef(linearRegressor)
         standard_errors = stderror(linearRegressor)
-        if model == "CAPM"
-            println("The modelled equation using test data is : Excess Returns = $(coefficients[1]) + $(coefficients[2]) MKT_RF ")
-            println("")
-            println("The standard errors of the coefficients are:")
-            println("Constant: $(standard_errors[1])")
-            println("MKT_RF: $(standard_errors[2])")
-        elseif model ==  "FF3"
-            println("The modelled equation using test data is : Excess Returns = $(coefficients[1]) + $(coefficients[2]) MKT_RF + $(coefficients[3]) SMB + $(coefficients[4]) HML ")
-            println("")
-            println("The standard errors of the coefficients are:")
-            println("Constant: $(standard_errors[1])")
-            println("MKT_RF: $(standard_errors[2])")
-            println("SMB: $(standard_errors[3])")
-            println("HML: $(standard_errors[4])")
-        elseif model ==  "FF5"
-            println("The modelled equation using test data is : Excess Returns = $(coefficients[1]) + $(coefficients[2]) MKT_RF + $(coefficients[3]) SMB + $(coefficients[4]) HML + $(coefficients[5]) RMW + $(coefficients[6]) CMA ")
-            println("")
-            println("The standard errors of the coefficients are:")
-            println("Constant: $(standard_errors[1])")
-            println("MKT_RF: $(standard_errors[2])")
-            println("SMB: $(standard_errors[3])")
-            println("HML: $(standard_errors[4])")
-            println("RMW: $(standard_errors[5])")
-            println("CMA: $(standard_errors[6])")
+        companyname = Dict([("Company", company),("Equation","Excess Returns = $(coefficients[1]) + $(coefficients[2]) MKT_RF"), ("Intercept", "$(coefficients[1]) [$(standard_errors[1])]"), ("MKT_RF","$(coefficients[2]) [$(standard_errors[2])]"), ("R_Square_Value","$(r2(linearRegressor))")])
+    
+        if model != "CAPM"
+            companyname["Equation"] = "Excess Returns = $(coefficients[1]) + $(coefficients[2]) MKT_RF + $(coefficients[3]) SMB + $(coefficients[4]) HML"
+            companyname["SMB"] = "$(coefficients[3]) [$(standard_errors[3])]"
+            companyname["HML"] = "$(coefficients[4]) [$(standard_errors[4])]"
+            
+            if model == "FF5"
+                companyname["Equation"] = "Excess Returns = $(coefficients[1]) + $(coefficients[2]) MKT_RF + $(coefficients[3]) SMB + $(coefficients[4]) HML + $(coefficients[5]) RMW + $(coefficients[6]) CMA"
+                companyname["RMW"] = "$(coefficients[5]) [$(standard_errors[5])]"
+                companyname["CMA"] = "$(coefficients[6]) [$(standard_errors[6])]"
+                data = DataFrame(companyname)
+                append!(output_df, data)
+                select!(output_df, :Company, :Equation, :Intercept, :MKT_RF, :SMB, :HML, :RMW, :CMA, :R_Square_Value)
+            else
+                data = DataFrame(companyname)
+                append!(output_df, data)
+                select!(output_df, :Company, :Equation, :Intercept, :MKT_RF, :SMB, :HML, :R_Square_Value)
+            end
+        else
+            data = DataFrame(companyname)
+            append!(output_df, data)
+            select!(output_df, :Company, :Equation, :Intercept, :MKT_RF, :R_Square_Value)
         end
-
-        # R Square value of the model
-        println("R Square value: ", r2(linearRegressor))
-
-        # Prediction
-        ypredicted_test = predict(linearRegressor, test)
-
-        # Test Performance 
-        performance_testdf = DataFrame(y_actual = test[!,:Excess_Returns], y_predicted = ypredicted_test)
-        performance_testdf.error = performance_testdf[!,:y_actual] - performance_testdf[!,:y_predicted]
-        performance_testdf.error_sq = performance_testdf.error.*performance_testdf.error
-        
-        
-        # Test Error
-        println("Mean Absolute test error: ",mean(abs.(performance_testdf.error)), "\n")
-        println("Mean square test error: ",mean(performance_testdf.error_sq), "\n")
-        
-        # Scatter plot of actual vs predicted values on test dataset
-        test_plot = scatter(performance_testdf[!,:y_actual],performance_testdf[!,:y_predicted], title = "Predicted value vs Actual value on Test Data", ylabel = "Predicted value", xlabel = "Actual value", legend = false)
-        
-        # Result of t test
-        println("T test results:")
-        println(ttestresults)
-        println("\n")
-        
-        # Result of f test
-        println("F test results: ")
-        println(ftest(linearRegressor.model))
+        output_df
     end
+    
+    println("Standard Errors are in parentheses for each coefficient")              
+    return output_df
+
 end   
 
 end
