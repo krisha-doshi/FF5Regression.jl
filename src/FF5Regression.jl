@@ -143,36 +143,34 @@ function model_results(sym, startdate, enddate, model)
         # coefficients and std errors of model 
         coefficients = coef(linearRegressor)
         standard_errors = stderror(linearRegressor)
-        companyname = Dict([("Company", company),("Equation","Excess Returns = $(coefficients[1]) + $(coefficients[2]) MKT_RF"), ("Intercept", "$(coefficients[1]) [$(standard_errors[1])]"), ("MKT_RF","$(coefficients[2]) [$(standard_errors[2])]"), ("R_Square_Value","$(r2(linearRegressor))")])
+        companyname = Dict([("Company", company), ("Intercept", coefficients[1]), ("MKT_RF", coefficients[2]), ("R_Square_Value", r2(linearRegressor))])
     
         if model != "CAPM"
-            companyname["Equation"] = "Excess Returns = $(coefficients[1]) + $(coefficients[2]) MKT_RF + $(coefficients[3]) SMB + $(coefficients[4]) HML"
-            companyname["SMB"] = "$(coefficients[3]) [$(standard_errors[3])]"
-            companyname["HML"] = "$(coefficients[4]) [$(standard_errors[4])]"
+            companyname["SMB"] = coefficients[3]
+            companyname["HML"] = coefficients[4]
             
             if model == "FF5"
-                companyname["Equation"] = "Excess Returns = $(coefficients[1]) + $(coefficients[2]) MKT_RF + $(coefficients[3]) SMB + $(coefficients[4]) HML + $(coefficients[5]) RMW + $(coefficients[6]) CMA"
-                companyname["RMW"] = "$(coefficients[5]) [$(standard_errors[5])]"
-                companyname["CMA"] = "$(coefficients[6]) [$(standard_errors[6])]"
+                companyname["RMW"] = coefficients[5]
+                companyname["CMA"] = coefficients[6]
                 data = DataFrame(companyname)
                 append!(output_df, data)
-                select!(output_df, :Company, :Equation, :Intercept, :MKT_RF, :SMB, :HML, :RMW, :CMA, :R_Square_Value)
+                select!(output_df, :Company, :Intercept, :MKT_RF, :SMB, :HML, :RMW, :CMA, :R_Square_Value)
             else
                 data = DataFrame(companyname)
                 append!(output_df, data)
-                select!(output_df, :Company, :Equation, :Intercept, :MKT_RF, :SMB, :HML, :R_Square_Value)
+                select!(output_df, :Company, :Intercept, :MKT_RF, :SMB, :HML, :R_Square_Value)
             end
         else
             data = DataFrame(companyname)
             append!(output_df, data)
-            select!(output_df, :Company, :Equation, :Intercept, :MKT_RF, :R_Square_Value)
+            select!(output_df, :Company, :Intercept, :MKT_RF, :R_Square_Value)
         end
         output_df
     end
     
-    println("Standard Errors are in parentheses for each coefficient")              
+    # if datatype == "DataFrame"
     return output_df
-
+    # end
 end   
 
 end
