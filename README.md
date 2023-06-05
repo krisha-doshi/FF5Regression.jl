@@ -2,6 +2,8 @@
 
 [![Build Status](https://github.com/krisha-doshi/FF5Regression.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/krisha-doshi/FF5Regression.jl/actions/workflows/CI.yml?query=branch%3Amain)
 
+
+## Introduction
 Computes Fama French Five Factor (FF5) loadings and alpha for given stock tickers.
 
 This downloads most recent monthly data from Yahoo Finance on the company's adjusted close and from Fama French 5 Factors documents. 
