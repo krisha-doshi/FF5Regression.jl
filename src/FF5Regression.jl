@@ -2,7 +2,9 @@ module FF5Regression
 using GLM, DataFrames, CSV, Plots, MLDataUtils, MLBase, HTTP, ZipFile, Dates, DataStructures
 
 """
-generate_ff_monthly_data: Generates the latest monthly data from the Fama French 5 Factors documents in the form of a 
+    generate_ff_monthly_data() 
+
+Generate the latest monthly data from the Fama French 5 Factors documents in the form of a 
 dataframe
 """
 function generate_ff_monthly_data()
@@ -45,6 +47,15 @@ function generate_ff_monthly_data()
     column_names = ["Month", "MKT_RF", "SMB", "HML", "RMW", "CMA", "RF"]
   
     df = CSV.File(IOBuffer(filtered_data), header=column_names) |> DataFrame
+
+    df[!,"MKT_RF"] = df[!,"MKT_RF"]/100
+    df[!,"SMB"] = df[!,"SMB"]/100
+    df[!,"HML"] = df[!,"HML"]/100
+    df[!,"RMW"] = df[!,"RMW"]/100
+    df[!,"CMA"] = df[!,"CMA"]/100
+    df[!,"RF"] = df[!,"RF"]/100
+
+
   end
 
   # Close the zip file when done
@@ -54,7 +65,9 @@ function generate_ff_monthly_data()
 end
 
 """
-get_historical: Generates a dataframe containing the monthly returns
+    get_monthly(sym, startd, endd)
+
+Generate a dataframe containing the monthly returns
 of a specific company with ticker `sym` in the specified timeframe 
 between `startd` and `endd`
 
@@ -63,7 +76,7 @@ params:
     - startd:: DateTime, starting date in the form 'yyyy-mm-dd'
     - endd:: DateTime, ending date in the form 'yyyy-mm-dd'
 """
-function get_historical(sym, startd, endd)
+function get_monthly(sym, startd, endd)
     symbol = uppercase(sym)
     starting = Int(datetime2unix.(DateTime(startd)))
     ending = Int(datetime2unix.(DateTime(endd)))
@@ -90,8 +103,10 @@ function get_historical(sym, startd, endd)
 end
 
 """
-get_main_data: Generates a dataframe containing the excess and monthly
-returns of a specific company with ticker `sym` and the Fama French 5 
+    get_main_data(sym, startdate, enddate)
+
+Generate a dataframe containing the excess and monthly returns
+of a specific company with ticker `sym` and the Fama French 5 
 factors data in the specified timeframe between `startd` and `endd`
 
 params:
@@ -101,18 +116,25 @@ params:
 """
 function get_main_data(sym, startdate, enddate)
     five_factors = generate_ff_monthly_data()
-    monthly = get_historical(sym, startdate, enddate)
+    monthly = get_monthly(sym, startdate, enddate)
     df = innerjoin(five_factors, monthly, on=:Month)
     df[!,:Excess_Returns] = df[:,8] - df[:,7]
     return df 
 end 
 
 """
-model_results: Calculates the equation of the multiple regression line 
-of excess returns against the Fama French 5 factors and the model 
-performance.
+    model_results_df(sym, startd, endd, model) 
+
+Calculate and return the coefficients for a model
+(CAPM, FF3 or FF5) as a dataframe.
+
+params:
+    - sym:: String , ticker
+    - startd:: DateTime, starting date in the form 'yyyy-mm-dd'
+    - endd:: DateTime, ending date in the form 'yyyy-mm-dd'
+    - model:: String, model used for regression (CAPM, FF3 or FF5)
 """
-function model_results(sym, startdate, enddate, model)
+function model_results_df(sym, startdate, enddate, model)
     if typeof(sym) == String
         companies = Base.vect(sym)
     elseif typeof(sym) == Array{String, 1} 
@@ -136,8 +158,7 @@ function model_results(sym, startdate, enddate, model)
     # output_dict = DefaultDict{String, Dict{String, String}}(()->Dict{String,String}())
     for company in companies
         df = get_main_data(company, startdate, enddate)
-        train, test = splitobs(shuffleobs(df), at = 0.75)
-        linearRegressor = lm(fm, train)
+        linearRegressor = lm(fm, df)
         ttestresults = @time linearRegressor
 
         # coefficients and std errors of model 
@@ -165,12 +186,67 @@ function model_results(sym, startdate, enddate, model)
             append!(output_df, data)
             select!(output_df, :Company, :Intercept, :MKT_RF, :R_Square_Value)
         end
-        output_df
     end
     
-    # if datatype == "DataFrame"
     return output_df
-    # end
+
+end   
+
+mutable struct Estimate
+    coefficient :: Float64
+    std_err :: Float64
+end
+
+"""
+    model_results_dict(sym, startd, endd) 
+
+Calculate and return the coefficients and standard errors for models 
+(CAPM, FF3 and FF5) as a nested dictionary.
+
+params:
+    - sym:: String , ticker
+    - startd:: DateTime, starting date in the form 'yyyy-mm-dd'
+    - endd:: DateTime, ending date in the form 'yyyy-mm-dd'
+"""
+function model_results_dict(sym, startdate, enddate)
+    if typeof(sym) == String
+        companies = Base.vect(sym)
+    elseif typeof(sym) == Array{String, 1} 
+        companies = sym
+    else
+        return("Incorrect data type entered as ticker - enter either a single ticker as a string or a vector containing multiple tickers")
+    end
+
+    output_dict = DefaultDict{String, Dict{String, Dict{String, Any}}}(()->Dict{String,Dict{String, Any}}())
+    
+    for company in companies
+        df = get_main_data(company, startdate, enddate)
+
+        output_dict[company] = Dict()
+
+        fmCAPM = @formula(Excess_Returns ~ MKT_RF) 
+        linearRegressorCAPM = lm(fmCAPM, df)
+        coefficientsCAPM = coef(linearRegressorCAPM)
+        standard_errorsCAPM = stderror(linearRegressorCAPM)
+        output_dict[company]["CAPM"] = Dict([("Intercept", Estimate(coefficientsCAPM[1], standard_errorsCAPM[1])), ("MKT_RF", Estimate(coefficientsCAPM[2], standard_errorsCAPM[2])), ("R_Square_Value", r2(linearRegressorCAPM))])
+
+
+        fmFF3 = @formula(Excess_Returns ~ MKT_RF + SMB + HML) 
+        linearRegressorFF3 = lm(fmFF3, df)
+        coefficientsFF3 = coef(linearRegressorFF3)
+        standard_errorsFF3 = stderror(linearRegressorFF3)
+        output_dict[company]["FF3"] = Dict([("Intercept", Estimate(coefficientsFF3[1], standard_errorsFF3[1])), ("MKT_RF", Estimate(coefficientsFF3[2], standard_errorsFF3[2])), ("SMB", Estimate(coefficientsFF3[3], standard_errorsFF3[3])), ("HML", Estimate(coefficientsFF3[4], standard_errorsFF3[4])), ("R_Square_Value", r2(linearRegressorFF3))])
+
+        fmFF5 = @formula(Excess_Returns ~ MKT_RF + SMB + HML + RMW + CMA)
+        linearRegressorFF5 = lm(fmFF5, df)
+        coefficientsFF5 = coef(linearRegressorFF5)
+        standard_errorsFF5 = stderror(linearRegressorFF5)
+        output_dict[company]["FF5"] = Dict([("Intercept", Estimate(coefficientsFF5[1], standard_errorsFF5[1])), ("MKT_RF", Estimate(coefficientsFF5[2], standard_errorsFF5[2])), ("SMB", Estimate(coefficientsFF5[3], standard_errorsFF5[3])), ("HML", Estimate(coefficientsFF5[4], standard_errorsFF5[4])), ("RMW", Estimate(coefficientsFF5[5], standard_errorsFF5[5])), ("CMA", Estimate(coefficientsFF5[6], standard_errorsFF5[6])), ("R_Square_Value", r2(linearRegressorFF5))])
+
+    end
+    
+    return output_dict
+
 end   
 
 end
