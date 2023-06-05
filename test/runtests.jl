@@ -26,6 +26,7 @@ using GLM, DataFrames, CSV, Plots, MLDataUtils, MLBase, HTTP, ZipFile, Dates, Da
     # Testing model_results_df
     df4 = ModelRegression.model_results_df(Base.vect("aapl", "amd"), "1963-07-01", now(), "FF3")
     @test ncol(df4) == 6
+    @test nrow(df4) == 2
     @test ModelRegression.model_results_df(Base.vect("aapl", "amd"), "1963-07-01", now(), "FF4") == "Incorrect model entered"
 
     # Testing model_results_dict
