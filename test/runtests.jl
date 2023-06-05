@@ -1,6 +1,6 @@
 using .ModelRegression
 using Test
-using GLM, DataFrames, CSV, Plots, MLDataUtils, MLBase, HTTP, ZipFile, Dates, DataStructures
+using GLM, DataFrames, CSV, Plots, HTTP, ZipFile, Dates, DataStructures
 
 @testset "ModelRegression.jl" begin
     # Testing generate_ff_monthly_data

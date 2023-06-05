@@ -1,5 +1,5 @@
 module ModelRegression
-using GLM, DataFrames, CSV, Plots, MLDataUtils, MLBase, HTTP, ZipFile, Dates, DataStructures
+using GLM, DataFrames, CSV, Plots, HTTP, ZipFile, Dates, DataStructures
 
 """
     generate_ff_monthly_data() 
