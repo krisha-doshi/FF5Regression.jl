@@ -79,7 +79,7 @@ params:
 function get_monthly(sym, startd, endd)
     symbol = uppercase(sym)
     starting = Int(datetime2unix.(DateTime(startd)))
-    ending = Int(datetime2unix.(DateTime(endd)))
+    ending = Int(datetime2unix.(DateTime(Date(endd))))
     url = "https://query1.finance.yahoo.com/v7/finance/download/$symbol?period1=$starting&period2=$ending&interval=1mo&events=history&includeAdjustedClose=true"
     response = HTTP.get(url)
     data = CSV.File(IOBuffer(response.body)) |> DataFrame
@@ -129,7 +129,7 @@ Calculate and return the coefficients for a model
 (CAPM, FF3 or FF5) as a dataframe.
 
 params:
-    - sym:: String , ticker
+    - sym:: String or Vector, ticker
     - startd:: DateTime, starting date in the form 'yyyy-mm-dd'
     - endd:: DateTime, ending date in the form 'yyyy-mm-dd'
     - model:: String, model used for regression (CAPM, FF3 or FF5)
@@ -139,8 +139,6 @@ function model_results_df(sym, startdate, enddate, model)
         companies = Base.vect(sym)
     elseif typeof(sym) == Array{String, 1} 
         companies = sym
-    else
-        return("Incorrect data type entered as ticker - enter either a single ticker as a string or a vector containing multiple tickers")
     end
 
     # model formula
@@ -204,7 +202,7 @@ Calculate and return the coefficients and standard errors for models
 (CAPM, FF3 and FF5) as a nested dictionary.
 
 params:
-    - sym:: String , ticker
+    - sym:: String or Vector, ticker
     - startd:: DateTime, starting date in the form 'yyyy-mm-dd'
     - endd:: DateTime, ending date in the form 'yyyy-mm-dd'
 """
@@ -213,8 +211,6 @@ function model_results_dict(sym, startdate, enddate)
         companies = Base.vect(sym)
     elseif typeof(sym) == Array{String, 1} 
         companies = sym
-    else
-        return("Incorrect data type entered as ticker - enter either a single ticker as a string or a vector containing multiple tickers")
     end
 
     output_dict = DefaultDict{String, Dict{String, Dict{String, Any}}}(()->Dict{String,Dict{String, Any}}())
